@@ -293,9 +293,9 @@ class FastCgiClient
      */
     public function close()
     {
-        if ($this->sock) {
-            socket_close($this->sock);
-            $this->sock = null;
+        if ($this->_sock) {
+            socket_close($this->_sock);
+            $this->_sock = null;
         }
     }
 
