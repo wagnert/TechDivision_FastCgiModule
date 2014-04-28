@@ -47,6 +47,20 @@ class FastCgiModule implements ModuleInterface
 {
     
     /**
+     * The default IP address for the Fast-CGI connection.
+     * 
+     * @var string
+     */
+    const DEFAULT_FAST_CGI_IP = '127.0.0.1';
+    
+    /**
+     * The default port for the Fast-CGI connection.
+     * 
+     * @var integer
+     */
+    const DEFAULT_FAST_CGI_PORT = 9010;
+    
+    /**
      * Defines the module name.
      *
      * @var string
@@ -95,7 +109,7 @@ class FastCgiModule implements ModuleInterface
         try {
             
             // create a new Fast-CGI client instance
-            $client = new FastCgiClient('127.0.0.1', 9010);
+            $client = new FastCgiClient(FastCgiModule::DEFAULT_FAST_CGI_IP, FastCgiModule::DEFAULT_FAST_CGI_PORT);
             
             // set the connection data to be used for the Fast-CGI connection
             if ($serverContext->hasModuleVar(ModuleVars::VOLATILE_FILE_HANDLER_VARIABLES)) {
@@ -106,6 +120,12 @@ class FastCgiModule implements ModuleInterface
                 }
                 if (isset($fileHandlerVariables['port'])) {
                     $client->setPort($fileHandlerVariables['port']);
+                }
+                if (isset($fileHandlerVariables['readWriteTimeout'])) {
+                    $client->setReadWriteTimeout($fileHandlerVariables['readWriteTimeout']);
+                }
+                if (isset($fileHandlerVariables['connectionTimeout'])) {
+                    $client->setConnectionTimeout($fileHandlerVariables['connectionTimeout']);
                 }
             }
             

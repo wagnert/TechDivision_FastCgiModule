@@ -108,22 +108,25 @@ class FastCgiClient
     private $_requests = array();
 
     /**
-     * Use persistent sockets to connect to backend
+     * Use persistent sockets to connect to backend.
+     * 
      * @var Boolean
      */
     private $_persistentSocket = false;
 
     /**
-     * Connect timeout in milliseconds
+     * Connect timeout in milliseconds.
+     * 
      * @var Integer
      */
     private $_connectTimeout = 5000;
 
     /**
-     * Read/Write timeout in milliseconds
+     * Read/Write timeout in milliseconds, defaults to 30 secs.
+     * 
      * @var Integer
      */
-    private $_readWriteTimeout = 5000;
+    private $_readWriteTimeout = 30000;
 
     /**
      * Constructor
