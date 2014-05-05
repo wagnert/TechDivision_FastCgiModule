@@ -15,7 +15,8 @@
     ],
     "require": {
         "php": ">=5.4.0",
-        "techdivision/webserver": "dev-master"
+        "techdivision/webserver": "dev-master",
+        "techdivision/fastcgi": "dev-master"
     },
     "autoload": {
         "psr-0": { "TechDivision": [ "src/", "tests/" ] }
