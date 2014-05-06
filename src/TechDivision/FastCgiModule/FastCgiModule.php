@@ -32,9 +32,11 @@ use TechDivision\WebServer\Interfaces\ModuleInterface;
 use TechDivision\WebServer\Exceptions\ModuleException;
 use TechDivision\WebServer\Interfaces\ServerContextInterface;
 
+use Crunch\FastCGI\Client as FastCgiClient;
+
 /**
- * This module allows us to let requests be handled by Fast-CGI client 
- * that has been configured in the web servers configuration. 
+ * This module allows us to let requests be handled by Fast-CGI client
+ * that has been configured in the web servers configuration.
  *
  * @category  Library
  * @package   TechDivision_FastCgiModule
@@ -45,21 +47,21 @@ use TechDivision\WebServer\Interfaces\ServerContextInterface;
  */
 class FastCgiModule implements ModuleInterface
 {
-    
+
     /**
      * The default IP address for the Fast-CGI connection.
-     * 
+     *
      * @var string
      */
     const DEFAULT_FAST_CGI_IP = '127.0.0.1';
-    
+
     /**
      * The default port for the Fast-CGI connection.
-     * 
+     *
      * @var integer
      */
     const DEFAULT_FAST_CGI_PORT = 9010;
-    
+
     /**
      * Defines the module name.
      *
@@ -73,7 +75,7 @@ class FastCgiModule implements ModuleInterface
      * @var \TechDivision\WebServer\Interfaces\ServerContextInterface
      */
     protected $serverContext;
-    
+
     /**
      * Implements module logic for given hook, in this case passing the Fast-CGI request
      * through to the configured Fast-CGI server.
@@ -91,7 +93,7 @@ class FastCgiModule implements ModuleInterface
         if (ModuleHooks::REQUEST_POST !== $hook) {
             return;
         }
-        
+
         // make the server context locally available
         $serverContext = $this->getServerContext();
 
@@ -107,28 +109,7 @@ class FastCgiModule implements ModuleInterface
         }
 
         try {
-            
-            // create a new Fast-CGI client instance
-            $client = new FastCgiClient(FastCgiModule::DEFAULT_FAST_CGI_IP, FastCgiModule::DEFAULT_FAST_CGI_PORT);
-            
-            // set the connection data to be used for the Fast-CGI connection
-            if ($serverContext->hasModuleVar(ModuleVars::VOLATILE_FILE_HANDLER_VARIABLES)) {
-                // load the volatile file handler variables and set connection data
-                $fileHandlerVariables = $serverContext->getModuleVar(ModuleVars::VOLATILE_FILE_HANDLER_VARIABLES);
-                if (isset($fileHandlerVariables['host'])) {
-                    $client->setHost($fileHandlerVariables['host']);
-                }
-                if (isset($fileHandlerVariables['port'])) {
-                    $client->setPort($fileHandlerVariables['port']);
-                }
-                if (isset($fileHandlerVariables['readWriteTimeout'])) {
-                    $client->setReadWriteTimeout($fileHandlerVariables['readWriteTimeout']);
-                }
-                if (isset($fileHandlerVariables['connectionTimeout'])) {
-                    $client->setConnectionTimeout($fileHandlerVariables['connectionTimeout']);
-                }
-            }
-            
+
             // prepare the Fast-CGI environment variables
             $environment = array(
                 ServerVars::GATEWAY_INTERFACE => 'FastCGI/1.0',
@@ -147,40 +128,58 @@ class FastCgiModule implements ModuleInterface
                 ServerVars::SERVER_PORT       => $serverContext->getServerVar(ServerVars::SERVER_PORT),
                 ServerVars::SERVER_NAME       => $serverContext->getServerVar(ServerVars::SERVER_NAME)
             );
-            
+
             // if we found a redirect status, add it to the environment variables
             if ($serverContext->hasServerVar(ServerVars::REDIRECT_STATUS)) {
                 $environment[ServerVars::REDIRECT_STATUS] = $serverContext->getServerVar(ServerVars::REDIRECT_STATUS);
             }
-            
+
             // if we found a Content-Type header, add it to the environment variables
             if ($request->hasHeader(HttpProtocol::HEADER_CONTENT_TYPE)) {
                 $environment['CONTENT_TYPE'] = $request->getHeader(HttpProtocol::HEADER_CONTENT_TYPE);
             }
-            
+
             // if we found a Content-Length header, add it to the environment variables
             if ($request->hasHeader(HttpProtocol::HEADER_CONTENT_LENGTH)) {
                 $environment['CONTENT_LENGTH'] = $request->getHeader(HttpProtocol::HEADER_CONTENT_LENGTH);
             }
-            
+
             // create an HTTP_ environment variable for each header
             foreach ($request->getHeaders() as $key => $value) {
                 $environment['HTTP_' . str_replace('-', '_', strtoupper($key))] = $value;
             }
-            
-            // create a new Fast-CGI connection and process the request
-            if ($request->hasHeader(HttpProtocol::HEADER_CONTENT_LENGTH)) {
-                $rawResponse = $client->request($environment, $bodyContent = $request->getBodyContent());
-            } else {
-                $rawResponse = $client->request($environment, '');
+
+            // initialize default host/port
+            $host = FastCgiModule::DEFAULT_FAST_CGI_IP;
+            $port = FastCgiModule::DEFAULT_FAST_CGI_PORT;
+
+            // set the connection data to be used for the Fast-CGI connection
+            if ($serverContext->hasModuleVar(ModuleVars::VOLATILE_FILE_HANDLER_VARIABLES)) {
+                // load the volatile file handler variables and set connection data
+                $fileHandlerVariables = $serverContext->getModuleVar(ModuleVars::VOLATILE_FILE_HANDLER_VARIABLES);
+                if (isset($fileHandlerVariables['host'])) {
+                    $host = $fileHandlerVariables['host'];
+                }
+                if (isset($fileHandlerVariables['port'])) {
+                    $port = $fileHandlerVariables['port'];
+                }
             }
-            
-            // close the Fast-CGI connection
-            $client->close();
-            
+
+            // create a new FastCGI client/connection instance
+            $fastCgiClient = new FastCgiClient($host, $port);
+            $fastCgiConnection = $fastCgiClient->connect();
+
+            // initialize a new FastCGI request instance
+            $bodyStream = $request->getBodyStream();
+            rewind($bodyStream);
+            $fastCgiRequest = $fastCgiConnection->newRequest($environment, $bodyStream);
+
+            // process the request
+            $rawResponse = $fastCgiConnection->request($fastCgiRequest);
+
             // format the raw response
-            $fastCgiResponse = $this->formatResponse($rawResponse);
-            
+            $fastCgiResponse = $this->formatResponse($rawResponse->content);
+
             // set the Fast-CGI response value in the WebServer response
             $response->setStatusCode($fastCgiResponse['statusCode']);
             $response->appendBodyStream($fastCgiResponse['body']);
@@ -204,7 +203,7 @@ class FastCgiModule implements ModuleInterface
 
             // set response state to be dispatched after this without calling other modules process
             $response->setState(HttpResponseStates::DISPATCH);
-        
+
         } catch (\Exception $e) { // catch all exceptions
             throw new ModuleException($e);
         }
@@ -228,24 +227,24 @@ class FastCgiModule implements ModuleInterface
         // Format the header.
         $header = array();
         $headerLines = explode("\n", $rawHeader);
-        
+
         // Initialize the status code and the status header
         $code = '200';
         $headerStatus = '200 OK';
-        
+
         // Iterate over the headers found in the response.
         foreach ($headerLines as $line) {
-            
+
             // Extract the header data.
             if (preg_match('/([\w-]+):\s*(.*)$/', $line, $matches)) {
 
                 // Initialize header name/value.
                 $headerName = strtolower($matches[1]);
                 $headerValue = trim($matches[2]);
-                
+
                 // If we found an status header (will only be available if not have a 200).
                 if ($headerName == 'status') {
-                    
+
                     // Initialize the status header and the code.
                     $headerStatus = $headerValue;
                     $code = $headerValue;
@@ -253,7 +252,7 @@ class FastCgiModule implements ModuleInterface
                         $code = substr($code, 0, $pos);
                     }
                 }
-                
+
                 // We need to know if this header is already availble
                 if (array_key_exists($headerName, $header)) {
 
@@ -265,13 +264,13 @@ class FastCgiModule implements ModuleInterface
                         // Convert the existing value into an array and append the new header value
                         $header[$headerName] = array($header[$headerName], $headerValue);
                     }
-                    
+
                 } else {
                     $header[$headerName] = $headerValue;
                 }
             }
         }
-        
+
         // Set the status header finally
         $header['status'] = $headerStatus;
 
