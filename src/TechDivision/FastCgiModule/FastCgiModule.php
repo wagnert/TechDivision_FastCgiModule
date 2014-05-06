@@ -170,11 +170,12 @@ class FastCgiModule implements ModuleInterface
             $fastCgiConnection = $fastCgiClient->connect();
 
             // initialize a new FastCGI request instance
-            $fastCgiRequest = $fastCgiConnection->newRequest($environment, $request->getBodyStream());
+            $bodyStream = $request->getBodyStream();
+            rewind($bodyStream);
+            $fastCgiRequest = $fastCgiConnection->newRequest($environment, $bodyStream);
 
             // process the request
-            $fastCgiConnection->sendStreamedRequest($fastCgiRequest);
-            $rawResponse = $fastCgiConnection->receiveResponse($fastCgiRequest);
+            $rawResponse = $fastCgiConnection->request($fastCgiRequest);
 
             // format the raw response
             $fastCgiResponse = $this->formatResponse($rawResponse->content);
