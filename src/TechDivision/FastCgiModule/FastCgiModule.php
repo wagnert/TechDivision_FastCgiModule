@@ -149,6 +149,11 @@ class FastCgiModule implements ModuleInterface
                 $environment['HTTP_' . str_replace('-', '_', strtoupper($key))] = $value;
             }
 
+            // create an HTTP_ environment variable for each server environment variable
+            foreach ($serverContext->getEnvVars() as $key => $value) {
+                $environment['HTTP_' . $key] = $value;
+            }
+
             // initialize default host/port
             $host = FastCgiModule::DEFAULT_FAST_CGI_IP;
             $port = FastCgiModule::DEFAULT_FAST_CGI_PORT;
