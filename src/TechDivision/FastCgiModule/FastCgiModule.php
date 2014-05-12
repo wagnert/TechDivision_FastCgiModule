@@ -151,7 +151,7 @@ class FastCgiModule implements ModuleInterface
 
             // create an HTTP_ environment variable for each server environment variable
             foreach ($serverContext->getEnvVars() as $key => $value) {
-                $environment['HTTP_' . $key] = $value;
+                $environment[$key] = $value;
             }
 
             // initialize default host/port
