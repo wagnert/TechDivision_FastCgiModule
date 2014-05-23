@@ -25,12 +25,12 @@ use TechDivision\Http\HttpProtocol;
 use TechDivision\Http\HttpResponseStates;
 use TechDivision\Http\HttpRequestInterface;
 use TechDivision\Http\HttpResponseInterface;
-use TechDivision\WebServer\Dictionaries\ServerVars;
-use TechDivision\WebServer\Dictionaries\ModuleVars;
-use TechDivision\WebServer\Dictionaries\ModuleHooks;
-use TechDivision\WebServer\Interfaces\ModuleInterface;
-use TechDivision\WebServer\Exceptions\ModuleException;
-use TechDivision\WebServer\Interfaces\ServerContextInterface;
+use TechDivision\Server\Dictionaries\ServerVars;
+use TechDivision\Server\Dictionaries\ModuleVars;
+use TechDivision\Server\Dictionaries\ModuleHooks;
+use TechDivision\Server\Interfaces\ModuleInterface;
+use TechDivision\Server\Exceptions\ModuleException;
+use TechDivision\Server\Interfaces\ServerContextInterface;
 
 use Crunch\FastCGI\Client as FastCgiClient;
 
@@ -60,7 +60,7 @@ class FastCgiModule implements ModuleInterface
      *
      * @var integer
      */
-    const DEFAULT_FAST_CGI_PORT = 9010;
+    const DEFAULT_FAST_CGI_PORT = 9002;
 
     /**
      * Defines the module name.
