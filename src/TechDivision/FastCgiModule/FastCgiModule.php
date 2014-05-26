@@ -60,7 +60,7 @@ class FastCgiModule implements ModuleInterface
      *
      * @var integer
      */
-    const DEFAULT_FAST_CGI_PORT = 9002;
+    const DEFAULT_FAST_CGI_PORT = 9010;
 
     /**
      * Defines the module name.
