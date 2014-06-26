@@ -32,6 +32,7 @@ use TechDivision\Server\Dictionaries\ModuleHooks;
 use TechDivision\Server\Interfaces\ModuleInterface;
 use TechDivision\Server\Exceptions\ModuleException;
 use TechDivision\Server\Interfaces\ServerContextInterface;
+use Crunch\FastCGI\ConnectionException;
 
 use Crunch\FastCGI\Client as FastCgiClient;
 
@@ -93,15 +94,33 @@ class FastCgiModule implements ModuleInterface
     protected $fastCgiConnections;
 
     /**
-     * Will return the fastCGI connection of this module. If there is none already it will be created.
+     * Will return the fastCGI connection of this module. If there is none already, it will be created.
+     * If this method returns null we do not have enough information to establish a connection.
+     * Will throw and exception on error.
      *
-     * @param string  $host The host to get the connection for
-     * @param integer $port The port of the connection
-     *
-     * @return \Crunch\FastCGI\Connection
+     * @return \Crunch\FastCGI\Connection|null
+     * @throws \TechDivision\Server\Exceptions\ModuleException
      */
-    public function getFastCgiConnection($host, $port)
+    public function getFastCgiConnection()
     {
+        // initialize default host/port
+        $host = FastCgiModule::DEFAULT_FAST_CGI_IP;
+        $port = FastCgiModule::DEFAULT_FAST_CGI_PORT;
+
+        // set the connection data to be used for the Fast-CGI connection
+        $fileHandlerVariables = array();
+        if ($this->serverContext->hasModuleVar(ModuleVars::VOLATILE_FILE_HANDLER_VARIABLES)) {
+            // load the volatile file handler variables and set connection data
+            $fileHandlerVariables = $this->serverContext->getModuleVar(ModuleVars::VOLATILE_FILE_HANDLER_VARIABLES);
+            if (isset($fileHandlerVariables['host'])) {
+                $host = $fileHandlerVariables['host'];
+            }
+            if (isset($fileHandlerVariables['port'])) {
+                $port = $fileHandlerVariables['port'];
+            }
+
+        }
+
         // Get the identifier for our pool
         $connectionIdentifier = $host . self::IDENTIFIER_SEPARATOR . $port;
 
@@ -109,7 +128,28 @@ class FastCgiModule implements ModuleInterface
         if (!isset($this->fastCgiConnections[$connectionIdentifier]) ||
             !is_a($this->fastCgiConnections[$connectionIdentifier], '\Crunch\FastCGI\Connection')) {
 
-            $this->createConnection($host, $port);
+            // Try to connect to the host and port we got. ATTENTION!
+            // It might be possible that there is no backend at this host/port combination as we jsut started our
+            // server and therefor do not have a volatile file handler based on the requested URL.
+            // Therefor the connection might fail for a good reason, take that into account!
+            try {
+
+                // Try to create the connection
+                $this->createConnection($host, $port);
+
+            } catch (ConnectionException $e) {
+
+                // If we do NOT have a volatile file handler this is no error, just the default settings not working!
+                if (empty($fileHandlerVariables)) {
+
+                    // Tell them we got nothing
+                    return null;
+                }
+
+                // It seems to be an error, rethrow $e
+                throw new ModuleException($e->getMessage());
+            }
+
         }
 
         // Return the connection
@@ -194,26 +234,10 @@ class FastCgiModule implements ModuleInterface
                 $environment[$key] = $value;
             }
 
-            // initialize default host/port
-            $host = FastCgiModule::DEFAULT_FAST_CGI_IP;
-            $port = FastCgiModule::DEFAULT_FAST_CGI_PORT;
-
-            // set the connection data to be used for the Fast-CGI connection
-            if ($serverContext->hasModuleVar(ModuleVars::VOLATILE_FILE_HANDLER_VARIABLES)) {
-                // load the volatile file handler variables and set connection data
-                $fileHandlerVariables = $serverContext->getModuleVar(ModuleVars::VOLATILE_FILE_HANDLER_VARIABLES);
-                if (isset($fileHandlerVariables['host'])) {
-                    $host = $fileHandlerVariables['host'];
-                }
-                if (isset($fileHandlerVariables['port'])) {
-                    $port = $fileHandlerVariables['port'];
-                }
-            }
-
             // initialize a new FastCGI request instance
             $bodyStream = $request->getBodyStream();
             rewind($bodyStream);
-            $fastCgiConnection = $this->getFastCgiConnection($host, $port);
+            $fastCgiConnection = $this->getFastCgiConnection();
             $fastCgiRequest = $fastCgiConnection->newRequest($environment, $bodyStream);
 
             // process the request
@@ -379,8 +403,8 @@ class FastCgiModule implements ModuleInterface
      */
     public function prepare()
     {
-        // Prepare a connection to the default host and part
-        $this->createConnection(FastCgiModule::DEFAULT_FAST_CGI_IP, FastCgiModule::DEFAULT_FAST_CGI_PORT);
+        // Prepare a connection by using our lazy-loading getter to pre-fill the pool
+        $this->getFastCgiConnection();
     }
 
     /**
