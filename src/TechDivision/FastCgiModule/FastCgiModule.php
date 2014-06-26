@@ -14,6 +14,7 @@
  * @category  Library
  * @package   TechDivision_FastCgiModule
  * @author    Tim Wagner <tw@techdivision.com>
+ * @author    Bernhard Wick <b.wick@techdivision.com>
  * @copyright 2014 TechDivision GmbH <info@techdivision.com>
  * @license   http://opensource.org/licenses/osl-3.0.php Open Software License (OSL 3.0)
  * @link      https://github.com/techdivision/TechDivision_FastCgiModule
@@ -41,6 +42,7 @@ use Crunch\FastCGI\Client as FastCgiClient;
  * @category  Library
  * @package   TechDivision_FastCgiModule
  * @author    Tim Wagner <tw@techdivision.com>
+ * @author    Bernhard Wick <b.wick@techdivision.com>
  * @copyright 2014 TechDivision GmbH <info@techdivision.com>
  * @license   http://opensource.org/licenses/osl-3.0.php Open Software License (OSL 3.0)
  * @link      https://github.com/techdivision/TechDivision_FastCgiModule
@@ -70,11 +72,49 @@ class FastCgiModule implements ModuleInterface
     const MODULE_NAME = 'fastcgi';
 
     /**
+     * Separator for the connection identifier
+     *
+     * @var string
+     */
+    const IDENTIFIER_SEPARATOR = ':';
+
+    /**
      * Holds the servers context instance.
      *
-     * @var \TechDivision\WebServer\Interfaces\ServerContextInterface
+     * @var \TechDivision\Server\Interfaces\ServerContextInterface
      */
     protected $serverContext;
+
+    /**
+     * The fastCGI connection instance
+     *
+     * @var array<\Crunch\FastCGI\Connection> $fastCgiConnections
+     */
+    protected $fastCgiConnections;
+
+    /**
+     * Will return the fastCGI connection of this module. If there is none already it will be created.
+     *
+     * @param string  $host The host to get the connection for
+     * @param integer $port The port of the connection
+     *
+     * @return \Crunch\FastCGI\Connection
+     */
+    public function getFastCgiConnection($host, $port)
+    {
+        // Get the identifier for our pool
+        $connectionIdentifier = $host . self::IDENTIFIER_SEPARATOR . $port;
+
+        // If we do not have a connection already we will create one using the module's preparation hook
+        if (!isset($this->fastCgiConnections[$connectionIdentifier]) ||
+            !is_a($this->fastCgiConnections[$connectionIdentifier], '\Crunch\FastCGI\Connection')) {
+
+            $this->createConnection($host, $port);
+        }
+
+        // Return the connection
+        return $this->fastCgiConnections[$connectionIdentifier];
+    }
 
     /**
      * Implements module logic for given hook, in this case passing the Fast-CGI request
@@ -85,7 +125,7 @@ class FastCgiModule implements ModuleInterface
      * @param int                                      $hook     The current hook to process logic for
      *
      * @return bool
-     * @throws \TechDivision\WebServer\Exceptions\ModuleException
+     * @throws \TechDivision\Server\Exceptions\ModuleException
      */
     public function process(HttpRequestInterface $request, HttpResponseInterface $response, $hook)
     {
@@ -159,9 +199,9 @@ class FastCgiModule implements ModuleInterface
             $port = FastCgiModule::DEFAULT_FAST_CGI_PORT;
 
             // set the connection data to be used for the Fast-CGI connection
-            if ($serverContext->hasModuleVar(ModuleVars::VOLATILE_FILE_HANDLER_VARIABLES)) {
+            if ($this->serverContext->hasModuleVar(ModuleVars::VOLATILE_FILE_HANDLER_VARIABLES)) {
                 // load the volatile file handler variables and set connection data
-                $fileHandlerVariables = $serverContext->getModuleVar(ModuleVars::VOLATILE_FILE_HANDLER_VARIABLES);
+                $fileHandlerVariables = $this->serverContext->getModuleVar(ModuleVars::VOLATILE_FILE_HANDLER_VARIABLES);
                 if (isset($fileHandlerVariables['host'])) {
                     $host = $fileHandlerVariables['host'];
                 }
@@ -170,13 +210,10 @@ class FastCgiModule implements ModuleInterface
                 }
             }
 
-            // create a new FastCGI client/connection instance
-            $fastCgiClient = new FastCgiClient($host, $port);
-            $fastCgiConnection = $fastCgiClient->connect();
-
             // initialize a new FastCGI request instance
             $bodyStream = $request->getBodyStream();
             rewind($bodyStream);
+            $fastCgiConnection = $this->getFastCgiConnection($host, $port);
             $fastCgiRequest = $fastCgiConnection->newRequest($environment, $bodyStream);
 
             // process the request
@@ -220,6 +257,7 @@ class FastCgiModule implements ModuleInterface
      * @param string $stdout The plain, unformatted response.
      *
      * @return array An array containing the headers and body content
+     * @throws \TechDivision\Server\Exceptions\ModuleException
      */
     protected function formatResponse($stdout)
     {
@@ -258,7 +296,7 @@ class FastCgiModule implements ModuleInterface
                     }
                 }
 
-                // We need to know if this header is already availble
+                // We need to know if this header is already available
                 if (array_key_exists($headerName, $header)) {
 
                     // Check if the value is an array already
@@ -280,7 +318,7 @@ class FastCgiModule implements ModuleInterface
         $header['status'] = $headerStatus;
 
         if (false === ctype_digit($code)) {
-            throw new CommunicationException("Unrecognizable status code returned from fastcgi: $code");
+            throw new ModuleException("Unrecognizable status code returned from fastcgi: $code");
         }
 
         return array(
@@ -313,10 +351,10 @@ class FastCgiModule implements ModuleInterface
     /**
      * Initiates the module
      *
-     * @param \TechDivision\WebServer\Interfaces\ServerContextInterface $serverContext The server's context instance
+     * @param \TechDivision\Server\Interfaces\ServerContextInterface $serverContext The server's context instance
      *
      * @return bool
-     * @throws \TechDivision\WebServer\Exceptions\ModuleException
+     * @throws \TechDivision\Server\Exceptions\ModuleException
      */
     public function init(ServerContextInterface $serverContext)
     {
@@ -326,7 +364,7 @@ class FastCgiModule implements ModuleInterface
     /**
      * Return's the server context instance
      *
-     * @return \TechDivision\WebServer\Interfaces\ServerContextInterface
+     * @return \TechDivision\Server\Interfaces\ServerContextInterface
      */
     public function getServerContext()
     {
@@ -341,7 +379,25 @@ class FastCgiModule implements ModuleInterface
      */
     public function prepare()
     {
-        // nothing to prepare for this module right now
-        // todo: preopen connection to fastcgi backend for persistent connection
+        // Prepare a connection to the default host and part
+        $this->createConnection(FastCgiModule::DEFAULT_FAST_CGI_IP, FastCgiModule::DEFAULT_FAST_CGI_PORT);
+    }
+
+    /**
+     * Will create a fastCGI connection for a certain host and port and add it to the connection pool
+     *
+     * @param string  $host The host to get the connection for
+     * @param integer $port The port of the connection
+     *
+     * @return bool
+     */
+    protected function createConnection($host, $port)
+    {
+        // create a new FastCGI client/connection instance
+        $fastCgiClient = new FastCgiClient($host, $port);
+        $this->fastCgiConnections[$host . self::IDENTIFIER_SEPARATOR . $port] = $fastCgiClient->connect();
+
+        // Still here? That sounds good
+        return true;
     }
 }
