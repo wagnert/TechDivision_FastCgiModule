@@ -199,9 +199,9 @@ class FastCgiModule implements ModuleInterface
             $port = FastCgiModule::DEFAULT_FAST_CGI_PORT;
 
             // set the connection data to be used for the Fast-CGI connection
-            if ($this->serverContext->hasModuleVar(ModuleVars::VOLATILE_FILE_HANDLER_VARIABLES)) {
+            if ($serverContext->hasModuleVar(ModuleVars::VOLATILE_FILE_HANDLER_VARIABLES)) {
                 // load the volatile file handler variables and set connection data
-                $fileHandlerVariables = $this->serverContext->getModuleVar(ModuleVars::VOLATILE_FILE_HANDLER_VARIABLES);
+                $fileHandlerVariables = $serverContext->getModuleVar(ModuleVars::VOLATILE_FILE_HANDLER_VARIABLES);
                 if (isset($fileHandlerVariables['host'])) {
                     $host = $fileHandlerVariables['host'];
                 }
