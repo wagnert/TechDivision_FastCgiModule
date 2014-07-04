@@ -22,6 +22,8 @@
 
 namespace TechDivision\FastCgiModule;
 
+use TechDivision\Connection\ConnectionRequestInterface;
+use TechDivision\Connection\ConnectionResponseInterface;
 use TechDivision\Http\HttpProtocol;
 use TechDivision\Http\HttpResponseStates;
 use TechDivision\Http\HttpRequestInterface;
@@ -31,6 +33,7 @@ use TechDivision\Server\Dictionaries\ModuleVars;
 use TechDivision\Server\Dictionaries\ModuleHooks;
 use TechDivision\Server\Interfaces\ModuleInterface;
 use TechDivision\Server\Exceptions\ModuleException;
+use TechDivision\Server\Interfaces\RequestContextInterface;
 use TechDivision\Server\Interfaces\ServerContextInterface;
 use Crunch\FastCGI\ConnectionException;
 
@@ -87,6 +90,13 @@ class FastCgiModule implements ModuleInterface
     protected $serverContext;
 
     /**
+     * Hold's the request's context
+     *
+     * @var \TechDivision\Server\Interfaces\RequestContextInterface
+     */
+    protected $requestContext;
+
+    /**
      * The fastCGI connection instance
      *
      * @var array<\Crunch\FastCGI\Connection> $fastCgiConnections
@@ -103,15 +113,18 @@ class FastCgiModule implements ModuleInterface
      */
     public function getFastCgiConnection()
     {
+        // get local ref of request context
+        $requestContext = $this->getRequestContext();
+
         // initialize default host/port
         $host = FastCgiModule::DEFAULT_FAST_CGI_IP;
         $port = FastCgiModule::DEFAULT_FAST_CGI_PORT;
 
         // set the connection data to be used for the Fast-CGI connection
         $fileHandlerVariables = array();
-        if ($this->serverContext->hasModuleVar(ModuleVars::VOLATILE_FILE_HANDLER_VARIABLES)) {
+        if ($requestContext->hasModuleVar(ModuleVars::VOLATILE_FILE_HANDLER_VARIABLES)) {
             // load the volatile file handler variables and set connection data
-            $fileHandlerVariables = $this->serverContext->getModuleVar(ModuleVars::VOLATILE_FILE_HANDLER_VARIABLES);
+            $fileHandlerVariables = $requestContext->getModuleVar(ModuleVars::VOLATILE_FILE_HANDLER_VARIABLES);
             if (isset($fileHandlerVariables['host'])) {
                 $host = $fileHandlerVariables['host'];
             }
@@ -157,33 +170,56 @@ class FastCgiModule implements ModuleInterface
     }
 
     /**
+     * Return's the request's context instance
+     *
+     * @return \TechDivision\Server\Interfaces\RequestContextInterface
+     */
+    public function getRequestContext()
+    {
+        return $this->requestContext;
+    }
+
+    /**
      * Implements module logic for given hook, in this case passing the Fast-CGI request
      * through to the configured Fast-CGI server.
      *
-     * @param \TechDivision\Http\HttpRequestInterface  $request  The request object
-     * @param \TechDivision\Http\HttpResponseInterface $response The response object
-     * @param int                                      $hook     The current hook to process logic for
+     * @param \TechDivision\Connection\ConnectionRequestInterface     $request        A request object
+     * @param \TechDivision\Connection\ConnectionResponseInterface    $response       A response object
+     * @param \TechDivision\Server\Interfaces\RequestContextInterface $requestContext A requests context instance
+     * @param int                                                     $hook           The current hook to process logic for
      *
      * @return bool
      * @throws \TechDivision\Server\Exceptions\ModuleException
      */
-    public function process(HttpRequestInterface $request, HttpResponseInterface $response, $hook)
-    {
+    public function process(
+        ConnectionRequestInterface $request,
+        ConnectionResponseInterface $response,
+        RequestContextInterface $requestContext,
+        $hook
+    ) {
+        // In php an interface is, by definition, a fixed contract. It is immutable.
+        // So we have to declair the right ones afterwards...
+        /** @var $request \TechDivision\Http\HttpRequestInterface */
+        /** @var $request \TechDivision\Http\HttpResponseInterface */
+
         // if false hook is comming do nothing
         if (ModuleHooks::REQUEST_POST !== $hook) {
             return;
         }
 
+        // add member ref of request context
+        $this->requestContext = $requestContext;
+
         // make the server context locally available
         $serverContext = $this->getServerContext();
 
         // check if server handler sais php modules should react on this request as file handler
-        if ($serverContext->getServerVar(ServerVars::SERVER_HANDLER) !== self::MODULE_NAME) {
+        if ($requestContext->getServerVar(ServerVars::SERVER_HANDLER) !== self::MODULE_NAME) {
             return;
         }
 
         // check if file does not exist
-        if (!$serverContext->hasServerVar(ServerVars::SCRIPT_FILENAME)) {
+        if (!$requestContext->hasServerVar(ServerVars::SCRIPT_FILENAME)) {
             $response->setStatusCode(404);
             throw new ModuleException(null, 404);
         }
@@ -193,25 +229,25 @@ class FastCgiModule implements ModuleInterface
             // prepare the Fast-CGI environment variables
             $environment = array(
                 ServerVars::GATEWAY_INTERFACE => 'FastCGI/1.0',
-                ServerVars::REQUEST_METHOD    => $serverContext->getServerVar(ServerVars::REQUEST_METHOD),
-                ServerVars::SCRIPT_FILENAME   => $serverContext->getServerVar(ServerVars::SCRIPT_FILENAME),
-                ServerVars::QUERY_STRING      => $serverContext->getServerVar(ServerVars::QUERY_STRING),
-                ServerVars::SCRIPT_NAME       => $serverContext->getServerVar(ServerVars::SCRIPT_NAME),
-                ServerVars::REQUEST_URI       => $serverContext->getServerVar(ServerVars::REQUEST_URI),
-                ServerVars::DOCUMENT_ROOT     => $serverContext->getServerVar(ServerVars::DOCUMENT_ROOT),
-                ServerVars::SERVER_PROTOCOL   => $serverContext->getServerVar(ServerVars::SERVER_PROTOCOL),
-                ServerVars::HTTPS             => $serverContext->getServerVar(ServerVars::HTTPS),
-                ServerVars::SERVER_SOFTWARE   => $serverContext->getServerVar(ServerVars::SERVER_SOFTWARE),
-                ServerVars::REMOTE_ADDR       => $serverContext->getServerVar(ServerVars::REMOTE_ADDR),
-                ServerVars::REMOTE_PORT       => $serverContext->getServerVar(ServerVars::REMOTE_PORT),
-                ServerVars::SERVER_ADDR       => $serverContext->getServerVar(ServerVars::SERVER_ADDR),
-                ServerVars::SERVER_PORT       => $serverContext->getServerVar(ServerVars::SERVER_PORT),
-                ServerVars::SERVER_NAME       => $serverContext->getServerVar(ServerVars::SERVER_NAME)
+                ServerVars::REQUEST_METHOD    => $requestContext->getServerVar(ServerVars::REQUEST_METHOD),
+                ServerVars::SCRIPT_FILENAME   => $requestContext->getServerVar(ServerVars::SCRIPT_FILENAME),
+                ServerVars::QUERY_STRING      => $requestContext->getServerVar(ServerVars::QUERY_STRING),
+                ServerVars::SCRIPT_NAME       => $requestContext->getServerVar(ServerVars::SCRIPT_NAME),
+                ServerVars::REQUEST_URI       => $requestContext->getServerVar(ServerVars::REQUEST_URI),
+                ServerVars::DOCUMENT_ROOT     => $requestContext->getServerVar(ServerVars::DOCUMENT_ROOT),
+                ServerVars::SERVER_PROTOCOL   => $requestContext->getServerVar(ServerVars::SERVER_PROTOCOL),
+                ServerVars::HTTPS             => $requestContext->getServerVar(ServerVars::HTTPS),
+                ServerVars::SERVER_SOFTWARE   => $requestContext->getServerVar(ServerVars::SERVER_SOFTWARE),
+                ServerVars::REMOTE_ADDR       => $requestContext->getServerVar(ServerVars::REMOTE_ADDR),
+                ServerVars::REMOTE_PORT       => $requestContext->getServerVar(ServerVars::REMOTE_PORT),
+                ServerVars::SERVER_ADDR       => $requestContext->getServerVar(ServerVars::SERVER_ADDR),
+                ServerVars::SERVER_PORT       => $requestContext->getServerVar(ServerVars::SERVER_PORT),
+                ServerVars::SERVER_NAME       => $requestContext->getServerVar(ServerVars::SERVER_NAME)
             );
 
             // if we found a redirect status, add it to the environment variables
-            if ($serverContext->hasServerVar(ServerVars::REDIRECT_STATUS)) {
-                $environment[ServerVars::REDIRECT_STATUS] = $serverContext->getServerVar(ServerVars::REDIRECT_STATUS);
+            if ($requestContext->hasServerVar(ServerVars::REDIRECT_STATUS)) {
+                $environment[ServerVars::REDIRECT_STATUS] = $requestContext->getServerVar(ServerVars::REDIRECT_STATUS);
             }
 
             // if we found a Content-Type header, add it to the environment variables
@@ -230,7 +266,7 @@ class FastCgiModule implements ModuleInterface
             }
 
             // create an HTTP_ environment variable for each server environment variable
-            foreach ($serverContext->getEnvVars() as $key => $value) {
+            foreach ($requestContext->getEnvVars() as $key => $value) {
                 $environment[$key] = $value;
             }
 
@@ -403,8 +439,7 @@ class FastCgiModule implements ModuleInterface
      */
     public function prepare()
     {
-        // Prepare a connection by using our lazy-loading getter to pre-fill the pool
-        $this->getFastCgiConnection();
+        // nothing yet
     }
 
     /**
