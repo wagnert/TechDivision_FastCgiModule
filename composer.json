@@ -15,7 +15,7 @@
     "require": {
         "php": ">=5.4.0",
         "techdivision/webserver": "0.2.*",
-        "crunch/fastcgi": "dev-master@dev"
+        "crunch/fastcgi": "@dev"
     },
     "autoload": {
         "psr-0": { 
