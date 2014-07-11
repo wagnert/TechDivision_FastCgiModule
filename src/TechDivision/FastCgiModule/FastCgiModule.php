@@ -36,7 +36,6 @@ use TechDivision\Server\Exceptions\ModuleException;
 use TechDivision\Server\Interfaces\RequestContextInterface;
 use TechDivision\Server\Interfaces\ServerContextInterface;
 use Crunch\FastCGI\ConnectionException;
-
 use Crunch\FastCGI\Client as FastCgiClient;
 
 /**
