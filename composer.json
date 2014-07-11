@@ -2,9 +2,8 @@
     "name": "techdivision/fastcgimodule",
     "description": "A Fast-CGI module for a php webserver",
     "homepage": "https://github.com/techdivision/TechDivision_FastCgiModule",
-    "keywords": ["fastcgi", "module", "webserver"],
-    "license": ["OSL-3.0"],
-    "minimum-stability": "dev",
+    "keywords": [ "fastcgi", "module", "webserver" ],
+    "license": [ "OSL-3.0" ],
     "authors": [
         {
             "name": "Tim Wagner",
@@ -15,11 +14,13 @@
     ],
     "require": {
         "php": ">=5.4.0",
-        "techdivision/webserver": "dev-master",
+        "techdivision/webserver": "0.2.*",
         "crunch/fastcgi": "dev-master"
     },
     "autoload": {
-        "psr-0": { "TechDivision": [ "src/", "tests/" ] }
+        "psr-0": { 
+            "TechDivision\\FastCgiModule": [ "src/", "tests/" ]
+        }
     },
     "config":{
         "github-oauth":{
