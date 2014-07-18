@@ -12,18 +12,12 @@
             "role": "Developer"
         }
     ],
-    "repositories": [
-        {
-            "type": "vcs",
-            "url": "https://github.com/techdivision/FastCGI"
-        }
-    ],
     "require": {
         "php": ">=5.4.0",
         "techdivision/connection": "0.1.*",
         "techdivision/server": "0.1.*",
         "techdivision/http": "0.1.*",
-        "crunch/fastcgi": "0.1.*"
+        "crunch/fastcgi": "@dev"
     },
     "autoload": {
         "psr-0": { 
