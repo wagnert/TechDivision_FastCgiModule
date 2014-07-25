@@ -1,32 +1,47 @@
 {
-    "name": "techdivision/fastcgimodule",
-    "description": "A Fast-CGI module for a php webserver",
-    "homepage": "https://github.com/techdivision/TechDivision_FastCgiModule",
-    "keywords": [ "fastcgi", "module", "webserver" ],
-    "license": [ "OSL-3.0" ],
-    "authors": [
-        {
-            "name": "Tim Wagner",
-            "email": "tw@techdivision.com",
-            "homepage": "http://www.techdivision.com",
-            "role": "Developer"
-        }
-    ],
-    "require": {
-        "php": ">=5.4.0",
-        "techdivision/connection": "0.1.*",
-        "techdivision/server": "0.1.*",
-        "techdivision/http": "0.1.*",
-        "crunch/fastcgi": "@dev"
-    },
-    "autoload": {
-        "psr-0": { 
-            "TechDivision\\FastCgiModule": [ "src/", "tests/" ]
-        }
-    },
-    "config":{
-        "github-oauth":{
-            "github.com":"604a3b5943228e434a5b52c2ba3cf72286d30db9"
-        }
-    }
+	"name" : "techdivision/fastcgimodule",
+	"description" : "A Fast-CGI module for a php webserver",
+	"homepage" : "https://github.com/techdivision/TechDivision_FastCgiModule",
+	"keywords" : [
+		"fastcgi",
+		"module",
+		"webserver"
+	],
+	"license" : "OSL-3.0",
+	"authors" : [{
+			"name" : "Tim Wagner",
+			"email" : "tw@techdivision.com",
+			"homepage" : "http://www.techdivision.com",
+			"role" : "Developer"
+		}
+	],
+	"require" : {
+		"php" : ">=5.4.0",
+		"techdivision/connection" : "0.1.*",
+		"techdivision/server" : "0.1.*",
+		"techdivision/http" : "0.1.*",
+		"crunch/fastcgi" : "@dev"
+	},
+	"require-dev" : {
+		"phpunit/phpunit" : "3.7.*",
+		"appserver-io/build" : "0.1.*"
+	},
+	"autoload" : {
+		"psr-0" : {
+			"TechDivision\\FastCgiModule" : [
+				"src/",
+				"tests/"
+			]
+		}
+	},
+	"config" : {
+		"github-oauth" : {
+			"github.com" : "604a3b5943228e434a5b52c2ba3cf72286d30db9"
+		}
+	},
+	"support" : {
+		"email" : "t.wagner@techdivision.com",
+		"issues" : "https://github.com/techdivision/TechDivision_FastCgiModule/issues",
+		"source" : "https://github.com/techdivision/TechDivision_FastCgiModule"
+	}
 }
