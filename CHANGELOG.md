@@ -1,3 +1,14 @@
+# Version 0.1.3
+
+## Bugfixes
+
+* Rolling back to FastCGI connection creation per request/no usage of persistent connections
+* Refactor to fix PHPMD errors/warnings
+
+## Features
+
+* None
+
 # Version 0.1.2
 
 ## Bugfixes
